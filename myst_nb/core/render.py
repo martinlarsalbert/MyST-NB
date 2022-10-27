@@ -17,13 +17,15 @@ from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Any, ClassVar, Iterator, Sequence, Union
 
-from docutils import nodes
+from docutils import core, io, nodes
 from docutils.parsers.rst import directives as options_spec
 from importlib_metadata import entry_points
 from myst_parser.config.main import MdParserConfig
 from myst_parser.mdit_to_docutils.base import token_line
 from myst_parser.parsers.mdit import create_md_parser
 from nbformat import NotebookNode
+
+# import pandas as pd
 from typing_extensions import Protocol
 
 from myst_nb.core.config import NbParserConfig
@@ -573,7 +575,10 @@ class NbElementRenderer:
         }:
             return self.render_image(data)
         if data.mime_type == "text/html":
-            return self.render_text_html(data)
+            if "dataframe" in data.string:
+                return self.render_dataframe(data)
+            else:
+                return self.render_text_html(data)
         if data.mime_type == "text/latex":
             return self.render_text_latex(data)
         if data.mime_type == "application/javascript":
@@ -619,6 +624,44 @@ class NbElementRenderer:
         return [
             nodes.raw(text=data.string, format="html", classes=["output", "text_html"])
         ]
+
+    def render_dataframe(self, data: MimeData) -> list[nodes.Element]:
+        """Render a notebook text/html mime data output which contains a dataframe."""
+        # result = re.search(r"(<table.*</table>)", data.string, flags=re.DOTALL)
+        # if result:
+        #    html_table = result.group(1)
+        # else:
+        #    # Fall back on html:
+        #    return self.render_text_html(data)
+
+        # Reconstruct the dataframe:
+        # df = pd.read_html(result.group(0), index_col=0)[0]
+
+        #
+        # table = nodes.table(cols=len(df.columns))
+        # group = nodes.tgroup()
+        # head = nodes.thead()
+        # body = nodes.tbody()
+        #
+        # table += group
+        # for i in range(len(df.columns)):
+        #    group += nodes.colspec(colwidth=6)
+        # group += head
+        # group += body
+        #
+        # row = nodes.row()
+        # for key in df.keys():
+        #    row += nodes.entry("", nodes.paragraph("", nodes.Text(key)))
+        # head += row
+        #
+        # for index, row_ in df.iterrows():
+        #    row = nodes.row()
+        #    for value in row_.values:
+        #        row += nodes.entry("", nodes.paragraph("", nodes.Text(str(value))))
+        #    body += row
+        #
+        table = ""
+        return [table]
 
     def render_text_latex(self, data: MimeData) -> list[nodes.Element]:
         """Render a notebook text/latex mime data output."""
@@ -1235,3 +1278,70 @@ def get_mime_priority(
         ((k, p) for k, p in base.items() if p is not None), key=lambda x: x[1]
     )
     return [k for k, _ in sort]
+
+
+def format_node_tree(node):
+    def is_interesting(value):
+        if value is None:
+            return False
+        if isinstance(value, bool):
+            return True
+        return bool(value)
+
+    def dump_attrs(node, indent):
+        str = ""
+        for key, value in node.attributes.items():
+            if not (is_interesting(value)):
+                continue
+            str += f"\n{indent}@{key} => {value}"
+        return str
+
+    def dump_children(node, indent):
+        str = ""
+        for child in node.children:
+            str += "\n" + dump(child, indent)
+        return str
+
+    def dump(node, indent):
+        str = f"{indent}{node.tagname}"
+
+        if node.tagname == "#text":
+            str += " => %s" % (node)
+
+        if hasattr(node, "attributes"):
+            str += dump_attrs(node, indent + "  ")
+        if hasattr(node, "children"):
+            str += dump_children(node, indent + "  ")
+        return str
+
+    text = dump(node, "")
+    return nodes.literal_block("", nodes.Text(text))
+
+
+def dump_node_tree(markup):
+    def internals(input_string):
+        overrides = {}
+        overrides["input_encoding"] = "unicode"
+        output, pub = core.publish_programmatically(
+            source_class=io.StringInput,
+            source=input_string,
+            source_path=None,
+            destination_class=io.NullOutput,
+            destination=None,
+            destination_path=None,
+            reader=None,
+            reader_name="standalone",
+            parser=None,
+            parser_name="restructuredtext",
+            writer=None,
+            writer_name="null",
+            settings=None,
+            settings_spec=None,
+            settings_overrides=overrides,
+            config_section=None,
+            enable_exit_status=None,
+        )
+        return pub.writer.document
+
+    doc = internals(markup)
+    return format_node_tree(doc)

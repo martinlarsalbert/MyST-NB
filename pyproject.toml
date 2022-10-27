@@ -47,6 +47,8 @@ dependencies = [
     # ipykernel is not a requirement of the library,
     # but is a common requirement for users (registers the python3 kernel)
     "ipykernel",
+    "lxml",
+    "pandas",
 ]
 
 [project.urls]
