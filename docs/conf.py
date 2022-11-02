@@ -1,6 +1,7 @@
 # Configuration file for the Sphinx documentation builder.
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 import os
+from re import A
 
 # -- Project information -----------------------------------------------------
 

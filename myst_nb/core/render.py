@@ -25,7 +25,7 @@ from myst_parser.mdit_to_docutils.base import token_line
 from myst_parser.parsers.mdit import create_md_parser
 from nbformat import NotebookNode
 
-# import pandas as pd
+import pandas as pd
 from typing_extensions import Protocol
 
 from myst_nb.core.config import NbParserConfig
@@ -557,15 +557,26 @@ class NbElementRenderer:
 
     def render_mime_type(self, data: MimeData) -> list[nodes.Element]:
         """Render a notebook mime output, as a block level element."""
+   
+        #paragraph_node = nodes.paragraph(text='Hej! from text')
+        #return [paragraph_node]
+   
         # try plugin renderers
-        for renderer in load_mime_renders():
-            nodes = renderer.handle_mime(self, data, False)
-            if nodes is not None:
-                return nodes
+        #for renderer in load_mime_renders():
+        #    nodes_ = renderer.handle_mime(self, data, False)
+        #    if nodes_ is not None:
+        #        return nodes_
 
         # try default renderers
+   
+        
         if data.mime_type == "text/plain":
-            return self.render_text_plain(data)
+            #if 'scrapbook' in data.output_metadata:
+            #    if 'name' in data.output_metadata['scrapbook']:
+            #        if data.output_metadata['scrapbook']['name']=='table':
+            #            return []
+            #return self.render_text_plain(data)
+            return []
         if data.mime_type in {
             "image/png",
             "image/jpeg",
@@ -618,7 +629,7 @@ class NbElementRenderer:
         )
         node["classes"] += ["output", "text_plain"]
         return [node]
-
+        
     def render_text_html(self, data: MimeData) -> list[nodes.Element]:
         """Render a notebook text/html mime data output."""
         return [
@@ -627,42 +638,50 @@ class NbElementRenderer:
 
     def render_dataframe(self, data: MimeData) -> list[nodes.Element]:
         """Render a notebook text/html mime data output which contains a dataframe."""
-        # result = re.search(r"(<table.*</table>)", data.string, flags=re.DOTALL)
-        # if result:
-        #    html_table = result.group(1)
-        # else:
-        #    # Fall back on html:
-        #    return self.render_text_html(data)
+        result = re.search(r"(<table.*</table>)", data.string, flags=re.DOTALL)
+        if result:
+           html_table = result.group(1)
+        else:
+           # Fall back on html:
+           return self.render_text_html(data)
 
-        # Reconstruct the dataframe:
-        # df = pd.read_html(result.group(0), index_col=0)[0]
+        #Reconstruct the dataframe:
+        df = pd.read_html(html_table, index_col=0)[0]
 
-        #
-        # table = nodes.table(cols=len(df.columns))
-        # group = nodes.tgroup()
-        # head = nodes.thead()
-        # body = nodes.tbody()
-        #
-        # table += group
-        # for i in range(len(df.columns)):
-        #    group += nodes.colspec(colwidth=6)
-        # group += head
-        # group += body
-        #
-        # row = nodes.row()
-        # for key in df.keys():
-        #    row += nodes.entry("", nodes.paragraph("", nodes.Text(key)))
-        # head += row
-        #
-        # for index, row_ in df.iterrows():
-        #    row = nodes.row()
-        #    for value in row_.values:
-        #        row += nodes.entry("", nodes.paragraph("", nodes.Text(str(value))))
-        #    body += row
-        #
-        table = ""
+        table = nodes.table(cols=len(df.columns))
+        group = nodes.tgroup()
+        head = nodes.thead()
+        body = nodes.tbody()
+        table += group
+        for i in range(len(df.columns)):
+           group += nodes.colspec(colwidth=6)
+        group += head
+        group += body
+        row = nodes.row()
+        for key in df.keys():
+           row += nodes.entry("", nodes.paragraph("", nodes.Text(key)))
+        head += row
+        for index, row_ in df.iterrows():
+           row = nodes.row()
+           for value in row_.values:
+               row += nodes.entry("", nodes.paragraph("", nodes.Text(str(value))))
+           body += row
+
+        #return [dump_node_tree(
+        #    u"""
+        #    +------+------+
+        #    | H1   | H2   |
+        #    +======+======+
+        #    | F1   | F2   |
+        #    +------+------+
+        #    """), format_node_tree(table), table]
+
+             
         return [table]
+        #paragraph_node = nodes.paragraph(text='Hej!')
 
+        #return [paragraph_node]
+        
     def render_text_latex(self, data: MimeData) -> list[nodes.Element]:
         """Render a notebook text/latex mime data output."""
         # TODO should we always assume this is math?
@@ -1241,6 +1260,7 @@ def base_render_priority() -> dict[str, dict[str, int | None]]:
             "image/jpeg": 30,
             "text/latex": 40,
             "text/markdown": 50,
+            "text/html":55,
             "text/plain": 60,
         },
         "linkcheck": {"text/latex": 10, "text/markdown": 20, "text/plain": 30},
