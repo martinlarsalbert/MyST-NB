@@ -587,7 +587,10 @@ class NbElementRenderer:
             return self.render_image(data)
         if data.mime_type == "text/html":
             if "dataframe" or "text/css" in data.string:  # Dataframe or pandas.io.formats.style.Styler
-                return self.render_dataframe(data)
+                try:
+                    return self.render_dataframe(data)
+                except:
+                    return self.render_text_html(data)
             else:
                 return self.render_text_html(data)
         if data.mime_type == "text/latex":
